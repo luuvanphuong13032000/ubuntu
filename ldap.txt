@@ -1,0 +1,93 @@
+Openldap Ubuntu Server & Client - xác thực tập trung
+Client: ubuntu desktop 18.04
+1 số thuật ngữ:
++ Entry (object): Một đơn vị trong thư mục LDAP. Mỗi entry đủ điều kiện 
+distinguished name (DN) của nó
+VD: dn: uid=yyang,ou=sales,dc=example,dc=com
+	* base DN : dc=kifarunix-demo,dc=com, 
+	* root DN: cn=admin,dc=kifarunix-demo,dc=com.
++ LDIF:  LDAP Data Interchange Format. Các tệp được sử dụng để nhập, xuất, 
+sao chép đến và từ máy chủ LDAP phải ở định dạng này
+Trên server:
+
+Cài đặt openldap:
+	sudo apt install slapd ldap-utils
+	-> Hộp thoại cài password cho admin entry trong ldap directory
+	-> tự động cấu hình, tạo entry admin cn cho mình:
+	+ Đặt tên miền DNS để xây dựng baseDN của thư mục LDAP
+
+Muốn config lại:
+	sudo dpkg-reconfigure slapd
+
+Xem slapd database:
+	slapcat
+
+Dùng ldapseach để tìm kiếm DN theo ý muốn:
+Ví dụ liệt kê tất cả ldap user: 
+	ldapsearch -x -LLL -H ldapi:/// -b dc=epu,dc=local
+Ví dụ tìm kiếm thông tin user (qua uid)
+	ldapsearch -x -LLL ldapi:/// -b dc=epu,dc=local 'uid=dangquang' cn gidNumber
+
+test connect:
+	ldapwhoami -H ldapi:/// -x
+
+Dùng ldapadd để thêm theo file ldif:
+
+Thêm ou people chứa ldap user và ou groups chứa các group
+Tệp user_group_base.ldif
+
+dn: ou=people,dc=epu,dc=local
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=epu,dc=local
+objectClass: organizationalUnit
+ou: groups
+
+thêm groups miners và add user dangquang vào gr này(tệp add_group_user.ldif)
+dn: uid=dangquang,ou=people,dc=epu,dc=local
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+uid: dangquang
+sn: dang
+givenName: quang
+cn: quang dang
+displayName: quang dang
+userPassword: quang12345
+loginShell: /bin/bash
+uidNumber: 10000
+gidNumber: 10000
+homeDirectory: /home/dangquang
+
+dn: cn=miners,ou=groups,dc=epu,dc=local
+objectClass: posixGroup
+cn: miners
+gidNumber: 10000
+memberUid: dangquang
+
+	ldapadd -x -D cn=admin,dc=epu,dc=local -W -f user_group_base.ldif
+
+
+Phía client:
+	sudo apt install libnss-ldapd
+
+	ldap server uri: ldap://192.168.59.140/----- địa chỉ cấu hình dns máy chủ, ip tĩnh máy chủ 
+	name services to configure: passwd, group, shadow
+	-> ghi cấu hình vào file /etc/nslcd.conf
+
+
+	sudo pam-auth-update -> tích hết (bằng dấu cách) --- trừ fingerprint 
+	
+restart dịch vụ:
+	sudo service nslcd restart
+	sudo service nscd restart
+
+đăng nhập bằng tài khoản  vừa tạo:
+
+	su - dangquang
+
+
+1 số yêu cầu mở rộng
+- cài phpldapadmin
+- mã hoá SSL/TLS

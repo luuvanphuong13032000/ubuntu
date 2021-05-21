@@ -1,0 +1,175 @@
+Trong bài viết này:
+
+server.epu.local: 
+- Ip: 192.168.1.11
+- DNS: 192.168.1.11
+- gateway4: 192.168.1.1
+
+dhcp cấp phát từ 100 -> 200
+
+client.epu.local:
+- Ip: 192.168.1.100
+
+Domain Name Service (DNS)
+
+(DNS) là một dịch vụ Internet ánh xạ địa chỉ IP và fully qualified domain names (FQDN) với nhau. 
+Bằng cách này, DNS giảm bớt nhu cầu nhớ địa chỉ IP. Máy tính chạy DNS được gọi là máy chủ định danh (name servers). 
+Ubuntu đi kèm với BIND (Berkley Internet Naming Daemon), chương trình phổ biến nhất được sử dụng để duy trì 
+name servers trên Linux.
+
+Update:
+
+sudo apt-get update 
+
+sudo apt-get upgrade 
+
+sudo apt-get dist-upgrade
+
+Cài đặt:
+
+sudo apt install bind9
+
+Kiểm tra và khắc phục DNS:
+
+sudo apt install dnsutils
+
+Cấu hình:
+
+Một số cấu hình phổ biến nhất là caching nameserver, primary server, and secondary server.
+
+- Khi được định cấu hình làm caching nameserver, BIND9 sẽ tìm câu trả lời cho các truy vấn tên và ghi nhớ câu 
+trả lời khi miền được truy vấn lại.
+
+- Primary server, BIND9 đọc dữ liệu cho zone từ một tệp trên máy chủ của nó và có thẩm quyền cho zone đó.
+
+- Secondary server, BIND9 lấy dữ liệu zone từ một nameserver khác có thẩm quyền cho zone.
+
+Chi tiết:
+
+- Thư mục cấu hình chính là /etc/bind. Ta sẽ cấu hình các file sau:
+	/etc/bind/named.conf (file cấu hình chính)
+	/etc/bind/named.conf.options (global DNS options)
+	/etc/bind/named.conf.local (for zone)
+	/etc/bind/named.conf.default-zones
+
+Caching Nameserver
+
+bỏ ghi chú và chỉnh sửa tệp /etc/bind/named.conf.options, đây là nơi server sẽ forward những request k được thực
+thi
+
+forwarders {
+    8.8.8.8;
+    8.8.4.4;
+};
+
+Primary Server
+
+Forward Zone File (phân giải tên miền -> IP)
+
+/etc/bind/named.conf.local
+thêm 1 zone mới:
+zone "epu.local" IN {
+    type master;
+    file "/etc/bind/db.epu.local";
+};
+
+tạo file zone mới /etc/bind/db.epu.local bằng cách dựa trên file mẫu /etc/bind/db.local
+
+sudo cp /etc/bind/db.local /etc/bind/db.epu.local
+
+
+chỉnh sửa /etc/bind/db.epu.local
+
+;
+; BIND data file for epu.local
+;
+$TTL    604800
+@       IN      SOA     server.epu.local. root.epu.local. (
+                              2         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+
+;--- Name Server Information
+
+@	IN	NS	server.epu.local.
+
+;--- IP address of Name Server
+
+server	IN	A	192.168.1.11
+
+;--- A - Record HostName To Ip Address
+
+client	IN	A	192.168.1.100
+
+
+Reverse Zone File (phân giải IP -> tên)
+
+Tương tự các bước như trên
+
+/etc/bind/named.conf.local
+
+zone "59.168.192.in-addr.arpa" IN {
+    type master;
+    file "/etc/bind/db.192";
+};
+
+tạo file zone mới /etc/bind/db.192bằng cách dựa trên file mẫu /etc/bind/db.127
+
+sudo cp /etc/bind/db.127 /etc/bind/db.192
+
+
+chỉnh sửa /etc/bind/db.192
+
+
+;
+; BIND reverse data file for local 192.168.1.XXX net
+;
+$TTL    604800
+@       IN      SOA     epu.local. root.epu.local. (
+                              3         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+;---Name Server Information
+
+@	IN	NS	server.epu.local.
+
+;---Reverse lookup for Name Server
+
+11	IN	PTR	server.epu.local.
+
+;---PTR Record IP address to HostName
+
+199	IN	PTR	client.epu.local.
+
+
+Secondary Server (có thể k tạo):
+
+được khuyến nghị nếu primary server không khả dụng
+
+
+edit file resolv.conf:
+
+nameserver  192.168.1.11
+
+
+kiểm tra syntax:
+
+sudo named-checkconf
+
+kiểm tra zone file:
+
+named-checkzone epu.local /etc/bind/db.epu.local
+named-checkzone 1.168.192.in-addr.arpa /etc/bind/db.192
+
+Restart lại dịch vụ:
+
+sudo systemctl restart bind9.service
+
+Kiểm tra bằng cách ping sử dụng domain name
+
+

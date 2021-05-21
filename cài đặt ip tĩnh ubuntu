@@ -1,0 +1,158 @@
+***cấu hình ip tĩnh trên ubuntu
+mở file để cấu hình bằng câu lệnh:  sudo vi /etc/netplan-00-installer-config.yaml
+
+- ta cấu hình như sau:
+ # This is the network config written by "subiquity"    (chú thích)
+ network:
+   ethernets:
+     enp0s3: 
+       dhcp4: no
+       addresses: [192.168.1.11/24]            (thay cùng dải với địa chỉ wifi để ping google)
+       gateway4: 192.168.1.1
+       nameservers:
+       	       addresses: [8.8.8.8, 8.8.4.4]   (có thể thay giốngvới địa chỉ gán cho máy ở trên )
+   version: 2
+
+- nhấn (ESC + :x)  nếu sử dụng trình chỉnh sửa vi để thoát
+
+- nhấn ctrl + X rồi Y để thoát nếu dùng nano
+
+- nhấn ESC rồi nhấn :qw nếu dùng vim để thoát 
+
+- kích hoạt địa chỉ ip tĩnh vừa cấu hình bằng câu lệnh: sudo netplan apply
+
+- kiểm tra địa chỉ: networkctl status 
+
+- có thể kiểm tra bằng câu lệnh: ifconfig
+
+- phải lắp đặt: sudo apt-get install net-tools
+
+
+
+***cấu hình dhcp cấp phát ip động trên ubuntu 
+
+
+*cấu hình và cài đặt trên server 
+
+- sudo apt-get update  (cập nhật lại)
+
+- sudo apt-get install isc-dhcp-server     (cài  đặt gói)
+
+-mở file cấu hình:  sudo vi /etc/dhcp/dhcpd.conf
+
+- ta cấu hình file như sau:
+  + tìm đến dòng #A slightly different configuration for a internal subnet.
+ subnet 192.168.1.0 netmask 255.255.255.0 {
+   range 192.168.1.100 192.168.1.200;
+   option domain-name-server 192.168.1.11;
+   option domain-name "epu.local";
+   option subnet-mask 255.255.255.0;
+   option routers 192.168.1.1;
+   option broadcast-address 192.168.1.255;
+   default-lease-time 600;
+   max-lease-time 7200;
+ }
+
+ở trên ta có thể thay các dải ip cung cấp cho máy khách dòng range . Địa chỉ DNS là 192.168.1.11 có thể thay bằng 192.168.1.1, 192.168.1.2. Địa chỉ option routers là 192.168.1.1 có thể thay.   Xem lệnh ifconfig để cấu hình theo 
+
+
+- ta mở file : sudo vi /etc/default/isc-dhcp-server
+
+- ta cấu hình file này như sau:
+
+INTERFACEv4 = "enp0s3"   - nếu dùng trên oracle virtual box
+INTERFACE = "ens33"     - nếu dùng vmware
+
+- khởi động lại cấu hình bằng câu lệnh: sudo systemctl restart isc-dhcp-server.service
+
+- ta có thể kiểm tra trạng thái hoạt động bằng câu lệnh: sudo systemctl status isc-dhcp-server.service
+
+- hoặc có thể kiểm tra trạng thái hoạt động bằng câu lệnh : service isc-dhcp-server status
+( trạng thái active (running) là đang hoạt động
+
+-kiểm tra xem những máy nào nhận địa chỉ ip động: sudo dhcp-lease-list
+
+* trên client: vào phần setting network xoá mạng đang cài đặt rồi thêm lại
+
+
+
+
+***Cài đặt NFS chia sẻ file
+
+*trên server
+-cập nhật: sudo apt update
+
+-cài đặt dịch vụ: sudo apt install nsf-kernel-server
+- tạo file chia sẻ mount:  sudo mkdir /var/nfs/general -p    (file có tên /var/nfs/general)
++ kiểm tra file được tạo hiển thị quyền với ngày tháng : ls -la /var/nfs/general  (lệnh chung là ls+ tên thư mục) 
+
+- thiết lập quyền sở hữu:  sudo chown nobody:nogroup /var/nfs/general    (có thể thay bằng tên thư mục mình tạo để chia sẻ. mình tạo thư mục /var/nfs/general)
+*mở file /etc/exports để cấu hình file chia sẻ. ( cấu hình chung)
+-
+ mở file: sudo vi /etc/exports       (mở với quyền root)
+##+ directory_to_share    client(share_option1,...,share_optionN)
+##+ chú thích: direction_to_share : tên file chia sẻ  --- client: địa chỉ ip máy   trạm 
+
+-ta cấu hình như sau:
+/var/nfs/general   client_ip(rw,sync,no_subtree_check)
+/home              client_ip(rw,sync,no_root_squash,no_subtree_check)
+
+## /var/nfs/general  --- tên file tạo ở trên
+
+rw là lựa chọn cho phép máy client  đọc và viết vào ổ đĩa
+
+sync Tùy chọn này buộc NFS ghi các thay đổi vào đĩa trước khi trả lời. Điều này dẫn đến một môi trường ổn định và nhất quán hơn vì câu trả lời phản ánh trạng thái thực tế của âm lượng từ xa. Tuy nhiên, nó cũng làm giảm tốc độ hoạt động của tệp.
+    
+    no_subtree_check: Tùy chọn này ngăn chặn việc kiểm tra cây con, là một quá trình mà máy chủ lưu trữ phải kiểm tra xem tệp có thực sự vẫn còn trong cây được xuất cho mọi yêu cầu hay không. Điều này có thể gây ra nhiều vấn đề khi một tệp được đổi tên trong khi khách hàng đã mở nó. Trong hầu hết mọi trường hợp, tốt hơn hết là bạn nên tắt tính năng kiểm tra cây con.
+    no_root_squash: Theo mặc định, NFS dịch các yêu cầu từ người dùng root từ xa thành người dùng không có đặc quyền trên máy chủ. Đây được coi là tính năng bảo mật để ngăn tài khoản gốc trên máy khách sử dụng hệ thống tệp của máy chủ lưu trữ làm tài khoản gốc. no_root_squash vô hiệu hóa hành vi này đối với một số chia sẻ nhất định.
+    
+
+-khởi động lại dịch vụ: sudo systemctl retart nfs-kernel-server
+-
+kiểm tra tường lửa trên host: sudo ufw   status
+
+-lệnh cho phép qua tường lửa: sudo ufw allow from client_ip to any port nfs
+
+-kiểm tra lại tường lửa; sudo ufw status
+
+*trên máy client
+
+-update lại: câu lệnh sudo apt-get update
+
+-cài đặt dịch vụ: sudo apt-get install nfs-common
+
+-tạo thư mục mount: sudo mkdir -p /nfs/general      (lệnh chung  sudo mkdir -p tên thư mục)
+
+-ta mount tới máy server: sudo mount host_ip:/var/nfs/general /nfs/general
+-                         sudo mount host_ip:/home /nfs/home   -- có thể k ghi vẫn 
+ 
+    chia sẻ được:      host_ip là địa chỉ máy chủ. /var/nfs/general tên thư mục tạo chia sẻ máy chủ. /var/general là thư mục mount được tạo trên máy client
+
+ -kiểm tra mount: df -h
+ 
+ - tạo file" sudo touch /nfs/home/home.test - trên thư mục home
+              sudo touch /nfs/general/general.test
+
+--đến đây có thể tạo chia sẻ file rồi Ngoài ra ta có thể cấu hình thêm để mounting the remote NFS directorie at boot
+
+##trên máy client
+
+- mở file: sudo vi /etc/fstab
+
+- cầu hình file như sau
+
+host_ip:/var/nfs/general /nfs/genernal nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0
+
+host_ip:/home    /nfs/home nfs auto,nofail,noatime,nolock,intr,tcp,actimeo=1800 0 0
+
+- ta có thể tìm kiếm thông tin hay giúp đỡ qua câu lệnh: man nfs
+
+-- ta có thể unmount an NFS remote share
+
+- sử dụng câu lệnh cd ~
+
+- sudo unmount /nfs/home
+
+-sudo unmount /nfs/general
+
+- kiểm tra lại: df -h 

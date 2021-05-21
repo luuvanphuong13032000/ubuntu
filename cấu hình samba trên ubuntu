@@ -1,0 +1,72 @@
+*** Cấu hình samba trên ubuntu chia sẻ thư mục trên ubuntu server
+
+
+sudo apt update
+
+sudo apt install samba
+
+
+--- kiểm tra xem samba cài đặt thành công không sử dụng câu lệnh:
+
+whereis samba
+
+
+----- cấu hình samba
+
+
+-- tạo file cấu hình chia sẻ:
+
+mkdir /home/<username>/sambashare/
+
+--chú thích <username là tên user máy mà mình đặt có thể dùng lệnh pwd để xem.
+-- sambashare là tên thư mục chia sẻ
+
+
+
+-- mở file cấu hình samba . Ta thêm các câu lệnh sau vào cuối
+
+- mở file cấu hình: sudo vi /etc/samba/smb.conf
+
+
+- thêm nội dung sau vào file cấu hình: 
+
+[sambashare]
+	comment = Samba on Ubuntu
+	path = /home/<username>/sambashare
+	read only = no
+	browsable = yes
+	
+	
+- nhấn esc :x  để thoát ra
+
+
+-chú thích dòng lệnh:
+
+	comment: Mô tả ngắn gọn về chia sẻ
+	path: đường dẫn đến thư mục chia sẻ
+	read only:  quyền sửa đổi nội dung trong thư mục được chia sẻ. Giá trị no nghĩa là sửa đổi còn giá trị yes có nghĩa là chỉ xem
+	browsable : khi giá trị là yes các trình quản lí file như ubuntu's default file manager sẽ liệt kê các file chia sẻ này trên "network"
+
+
+-- lưu và khởi động lại samba để có hiệu lực
+
+câu lệnh: sudo service smbd restart
+
+
+--- tạo tài khoản samba
+
+sudo useradd -M -d /samba/josh -s /usr/sbin/nologin -G sambashare josh
+
+
+    -M -do not create the user’s home directory. We’ll manually create this directory.
+    -d /samba/josh - set the user’s home directory to /samba/josh.
+    -s /usr/sbin/nologin - disable shell access for this user.
+    -G sambashare - add the user to the sambashare group.
+    
+    
+    
+---
+
+sudo smbpasswd -e josh
+
+chú thích : josh là tài khoản tạo 
